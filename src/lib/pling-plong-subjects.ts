@@ -748,35 +748,78 @@ function shuffle<T>(values: T[]): T[] {
 
 export function parseCustomPlingQuestions(value: string): {
   questions: [string, string][];
-  invalidLines: number[];
+  invalidPosts: { line: number; message: string }[];
+  totalPosts: number;
 } {
   const questions: [string, string][] = [];
-  const invalidLines: number[] = [];
+  const invalidPosts: { line: number; message: string }[] = [];
   const seen = new Set<string>();
+  let totalPosts = 0;
+  let wordQuestion: { text: string; line: number } | null = null;
 
-  value.split(/\r?\n/).forEach((line, index) => {
-    if (!line.trim()) return;
-    const separator = line.indexOf(";");
-    if (separator < 0) {
-      invalidLines.push(index + 1);
+  const addPost = (text: string, answer: string, line: number) => {
+    totalPosts++;
+    const question = text.trim();
+    const response = answer.trim();
+    if (!question) {
+      invalidPosts.push({ line, message: "Frågan saknar frågetext" });
       return;
     }
-    const text = line.slice(0, separator).trim();
-    const answer = line.slice(separator + 1).trim();
-    if (!text || !answer) {
-      invalidLines.push(index + 1);
+    if (!response) {
+      invalidPosts.push({ line, message: "Frågan saknar svar" });
       return;
     }
-    const normalizedQuestion = text.replace(/\s+/g, " ").toLocaleLowerCase("sv-SE");
+    const normalizedQuestion = question.replace(/\s+/g, " ").toLocaleLowerCase("sv-SE");
     if (seen.has(normalizedQuestion)) {
-      invalidLines.push(index + 1);
+      invalidPosts.push({ line, message: "Frågan finns redan" });
       return;
     }
     seen.add(normalizedQuestion);
-    questions.push([text, answer]);
+    questions.push([question, response]);
+  };
+
+  const finishWordQuestion = () => {
+    if (!wordQuestion) return;
+    addPost(wordQuestion.text, "", wordQuestion.line);
+    wordQuestion = null;
+  };
+
+  value.split(/\r?\n/).forEach((rawLine, index) => {
+    const lineNumber = index + 1;
+    const line = rawLine.trim();
+    if (!line) return;
+
+    const wordQuestionMatch = rawLine.match(/^\s*fråga\s*:(.*)$/i);
+    if (wordQuestionMatch) {
+      finishWordQuestion();
+      wordQuestion = { text: wordQuestionMatch[1]!.trim(), line: lineNumber };
+      return;
+    }
+
+    const wordAnswerMatch = rawLine.match(/^\s*svar\s*:(.*)$/i);
+    if (wordAnswerMatch) {
+      if (!wordQuestion) {
+        addPost("", wordAnswerMatch[1]!, lineNumber);
+      } else {
+        const question = wordQuestion;
+        wordQuestion = null;
+        addPost(question.text, wordAnswerMatch[1]!, question.line);
+      }
+      return;
+    }
+
+    finishWordQuestion();
+    const separator = line.indexOf(";");
+    if (separator < 0) {
+      totalPosts++;
+      invalidPosts.push({ line: lineNumber, message: "Semikolon saknas" });
+      return;
+    }
+    addPost(line.slice(0, separator), line.slice(separator + 1), lineNumber);
   });
 
-  return { questions, invalidLines };
+  finishWordQuestion();
+  return { questions, invalidPosts, totalPosts };
 }
 
 export function generateSubjectPlingPlong(options: {

@@ -79,8 +79,7 @@ function PlingPlongGame({
     () => parseCustomPlingQuestions(customQuestionsText),
     [customQuestionsText],
   );
-  const customQuestionsValid =
-    customQuestions.questions.length >= tileCount && customQuestions.invalidLines.length === 0;
+  const customQuestionsValid = customQuestions.questions.length >= tileCount;
 
   const start = useCallback(
     (groupsOverride?: number) => {
@@ -613,31 +612,70 @@ function PlingPlongGame({
                       <label className="block font-medium" htmlFor="custom-pling-questions">
                         Egna frågor och svar
                       </label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Klistra in frågor och svar från elevernas Word-dokument.
+                      </p>
+                      <p className="mt-2 whitespace-pre-line rounded-md bg-muted p-2 text-xs">
+                        {"Fråga: Vad heter Sveriges huvudstad?\nSvar: Stockholm"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Du kan också använda snabbformatet: Fråga;Svar
+                      </p>
                       <textarea
                         id="custom-pling-questions"
                         className={`${field} mt-1 min-h-36 w-full resize-y`}
                         value={customQuestionsText}
                         onChange={(e) => setCustomQuestionsText(e.target.value)}
-                        placeholder={"En fråga;Rätt svar\nEn annan fråga;Ett annat svar"}
-                        aria-describedby="custom-pling-help custom-pling-errors"
+                        placeholder={"Fråga: En fråga\nSvar: Rätt svar\n\nEn annan fråga;Ett annat svar"}
+                        aria-describedby="custom-pling-help"
                       />
                       <p id="custom-pling-help" className="text-xs text-muted-foreground">
-                        Skriv en fråga per rad och skilj frågan från svaret med semikolon (;). Minst
-                        en giltig rad krävs.
+                        Tomma rader ignoreras. Endast giltiga och unika frågor används i spelet.
                       </p>
-                      <p
-                        id="custom-pling-errors"
-                        className="text-xs text-destructive"
-                        aria-live="polite"
-                      >
-                        {customQuestions.invalidLines.length > 0
-                          ? `Kontrollera rad ${customQuestions.invalidLines.join(", ")}. Varje rad ska innehålla både fråga och svar avskilda med semikolon (;).`
-                          : customQuestions.questions.length === 0
-                            ? "Lägg till minst en fråga och ett svar."
-                            : customQuestions.questions.length < tileCount
-                              ? `Du har ${customQuestions.questions.length} unika frågor. Lägg till minst ${tileCount} för spelplanen du valt.`
-                              : ""}
-                      </p>
+                      {customQuestions.totalPosts > 0 && (
+                        <div className="mt-3 space-y-2 text-xs" aria-live="polite">
+                          <p>
+                            {customQuestions.totalPosts}{" "}
+                            {customQuestions.totalPosts === 1 ? "fråga hittades" : "frågor hittades"}
+                            {" · "}
+                            {customQuestions.questions.length} godkända
+                            {" · "}
+                            {customQuestions.invalidPosts.length} behöver rättas
+                          </p>
+                          {customQuestions.questions.length < tileCount && (
+                            <p className="text-muted-foreground">
+                              Lägg till {tileCount - customQuestions.questions.length} ytterligare
+                              giltiga {tileCount - customQuestions.questions.length === 1 ? "fråga" : "frågor"}{" "}
+                              för den valda spelplanen.
+                            </p>
+                          )}
+                          {customQuestions.invalidPosts.length > 0 && (
+                            <ul id="custom-pling-errors" className="space-y-1 text-destructive">
+                              {customQuestions.invalidPosts.map((post, index) => (
+                                <li key={`${post.line}-${index}`}>
+                                  Rad {post.line}: {post.message}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {customQuestions.questions.length > 0 && (
+                            <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-2">
+                              <p className="font-medium">Förhandsgranskning</p>
+                              {customQuestions.questions.map(([question, answer], index) => (
+                                <div key={`${index}-${question}`}>
+                                  <p>{question}</p>
+                                  <p className="text-muted-foreground">Svar: {answer}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {customQuestions.totalPosts === 0 && (
+                        <p id="custom-pling-errors" className="mt-2 text-xs text-muted-foreground">
+                          Lägg till frågor för att se en förhandsgranskning.
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
